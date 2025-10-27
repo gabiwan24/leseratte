@@ -1,0 +1,561 @@
+<!DOCTYPE html>
+<html lang="de">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Lese-Lern-App</title>
+    <!-- Einbindung von Tailwind CSS -->
+    <script src="https://cdn.tailwindcss.com"></script>
+    <!-- Einbindung der Playwrite DE Grundschrift -->
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=Playwrite+DE+Grund:wght@100..400&display=swap" rel="stylesheet">
+    
+    <style>
+        /* Verwendung der Playwrite Grundschrift */
+        body {
+            font-family: 'Playwrite DE Grund', cursive;
+            font-weight: 300; /* Eine gut lesbare Strichstärke für Fließtext */
+        }
+        
+        /* H1-Überschriften etwas dicker */
+        h1 {
+            font-weight: 400;
+        }
+
+        /* Benutzerdefinierte Stile für ein kinderfreundliches Aussehen */
+        .btn {
+            @apply px-6 py-3 rounded-lg shadow-md font-semibold text-white transition-transform transform hover:scale-105 focus:outline-none focus:ring-2 focus:ring-offset-2;
+            font-family: 'Inter', sans-serif; /* Buttons in einer serifenlosen Schrift für bessere Lesbarkeit */
+        }
+        .btn-green {
+            @apply bg-green-500 hover:bg-green-600 focus:ring-green-400;
+        }
+        .btn-blue {
+            @apply bg-blue-500 hover:bg-blue-600 focus:ring-blue-400;
+        }
+        .btn-gray {
+            @apply bg-gray-500 hover:bg-gray-600 focus:ring-gray-400;
+        }
+        .btn-orange {
+            @apply bg-orange-500 hover:bg-orange-600 focus:ring-orange-400;
+        }
+        
+        /* Stil für die Buchstaben-Checkboxen */
+        .buchstaben-label {
+            @apply block w-16 h-16 flex items-center justify-center text-3xl border-2 border-gray-300 rounded-lg cursor-pointer select-none transition-all;
+            font-weight: 400; /* Buchstaben fett anzeigen */
+        }
+        .buchstaben-input:checked + .buchstaben-label {
+            @apply bg-blue-500 text-white border-blue-500;
+        }
+        .buchstaben-input {
+            @apply opacity-0 absolute;
+        }
+        
+        /* Stil für das angezeigte Wort und die Silben */
+        #wort-anzeige {
+            font-weight: 400; /* Maximale Strichstärke der Schriftart */
+        }
+        .syllable-span {
+            margin-right: 0.25em; /* Leichter Abstand zwischen den Silben */
+            display: inline-block; /* Stellt sicher, dass der Abstand korrekt angewendet wird */
+        }
+    </style>
+</head>
+<body class="bg-gray-100 flex items-center justify-center min-h-screen p-4">
+
+    <div class="w-full max-w-2xl bg-white rounded-2xl shadow-xl p-6 md:p-10">
+
+        <!-- 1. Einstellungs-Ansicht -->
+        <div id="einstellungen">
+            <h1 class="text-3xl text-center text-gray-800 mb-8">Lese-Einstellungen</h1>
+            
+            <!-- Buchstabenauswahl -->
+            <div class="mb-6">
+                <h2 class="text-xl font-semibold mb-3">Gelernte Buchstaben:</h2>
+                <div id="buchstaben-auswahl" class="grid grid-cols-5 sm:grid-cols-8 gap-3">
+                    <!-- Checkboxen werden per JS eingefügt -->
+                </div>
+            </div>
+
+            <!-- Weitere Einstellungen -->
+            <div class="grid grid-cols-1 md:grid-cols-2 gap-6 mb-6">
+                <div>
+                    <label for="max-silben" class="block text-lg font-semibold mb-2">Maximale Silben:</label>
+                    <input type="number" id="max-silben" value="3" min="1" max="5" class="w-full p-3 border border-gray-300 rounded-lg text-lg text-center font-sans">
+                </div>
+                <div>
+                    <label for="worte-pro-runde" class="block text-lg font-semibold mb-2">Wörter pro Runde:</label>
+                    <input type="number" id="worte-pro-runde" value="10" min="3" max="20" class="w-full p-3 border border-gray-300 rounded-lg text-lg text-center font-sans">
+                </div>
+            </div>
+            
+            <!-- Einstellung Silbenfärbung -->
+            <div class="flex items-center gap-3 mb-8">
+                <!-- NEU: "checked" hinzugefügt, um es zum Standard zu machen -->
+                <input type="checkbox" id="silben-faerben-cb" class="h-5 w-5 rounded border-gray-300 text-blue-600 focus:ring-blue-500" checked>
+                <label for="silben-faerben-cb" class="text-lg font-semibold">Silben abwechselnd einfärben (blau/rot)</label>
+            </div>
+
+            <!-- Start-Button -->
+            <button id="start-btn" class="btn btn-green w-full text-2xl py-4">
+                Start!
+            </button>
+            <p id="einstellungen-fehler" class="text-red-500 text-center mt-4 hidden font-sans"></p>
+        </div>
+
+        <!-- 2. Spiel-Ansicht -->
+        <div id="spiel" class="hidden">
+            <!-- Fortschrittsanzeige -->
+            <div class="flex justify-between items-center mb-6">
+                <div id="fortschritt-text" class="text-lg font-semibold text-gray-700">Wort 1 von 10</div>
+                <button id="einstellungen-btn-spiel" class="text-sm text-blue-500 hover:underline">Einstellungen</button>
+            </div>
+
+            <!-- Wort-Anzeige -->
+            <!-- NEU: id="wort-container", overflow-hidden (statt overflow-x-auto) -->
+            <div id="wort-container" class="bg-blue-50 min-h-[200px] flex items-center justify-center rounded-lg mb-8 p-6 overflow-hidden">
+                <!-- GEÄNDERT: Start-Schriftgröße auf 6rem (neutrale Größe) gesetzt -->
+                <div id="wort-anzeige" class="text-gray-800 text-center whitespace-nowrap" style="font-size: 6rem;">
+                    ...
+                </div>
+            </div>
+
+            <!-- Steuerungs-Buttons -->
+            <div class="grid grid-cols-1 sm:grid-cols-3 gap-4">
+                <button id="vorlesen-btn" class="btn btn-orange text-xl">
+                    Vorlesen 🔈
+                </button>
+                <button id="ueberspringen-btn" class="btn btn-gray text-xl">
+                    Überspringen ➡️
+                </button>
+                <button id="richtig-btn" class="btn btn-green text-xl">
+                    Richtig gelesen ✅
+                </button>
+            </div>
+        </div>
+
+        <!-- 3. Auswertungs-Ansicht -->
+        <div id="auswertung" class="hidden text-center">
+            <h1 class="text-4xl text-green-600 mb-6">Super gemacht!</h1>
+            
+            <!-- Sterne-Anzeige -->
+            <!-- GEÄNDERT: text-6xl zu text-5xl (etwas kleiner) -->
+            <div id="sterne-anzeige" class="text-5xl mb-6">
+                <!-- Sterne werden per JS eingefügt -->
+            </div>
+
+            <!-- Punktzahl -->
+            <div id="score-anzeige" class="text-2xl font-semibold text-gray-700 mb-10">
+                Du hast 8 von 10 Wörtern richtig gelesen.
+            </div>
+
+            <!-- Buttons -->
+            <div class="flex flex-col sm:flex-row gap-4 justify-center">
+                <button id="neue-runde-btn" class="btn btn-green text-xl">
+                    Neue Runde
+                </button>
+                <button id="einstellungen-btn-auswertung" class="btn btn-blue text-xl">
+                    Einstellungen
+                </button>
+            </div>
+        </div>
+    </div>
+
+    <script>
+        document.addEventListener('DOMContentLoaded', () => {
+
+            // --- DOM-Elemente ---
+            const views = {
+                einstellungen: document.getElementById('einstellungen'),
+                spiel: document.getElementById('spiel'),
+                auswertung: document.getElementById('auswertung')
+            };
+            
+            const buchstabenContainer = document.getElementById('buchstaben-auswahl');
+            const maxSilbenInput = document.getElementById('max-silben');
+            const worteProRundeInput = document.getElementById('worte-pro-runde');
+            const silbenFaerbenCheckbox = document.getElementById('silben-faerben-cb');
+            const fehlerMeldung = document.getElementById('einstellungen-fehler');
+
+            const startBtn = document.getElementById('start-btn');
+            const fortschrittText = document.getElementById('fortschritt-text');
+            const wortAnzeige = document.getElementById('wort-anzeige');
+            const vorlesenBtn = document.getElementById('vorlesen-btn');
+            const ueberspringenBtn = document.getElementById('ueberspringen-btn');
+            const richtigBtn = document.getElementById('richtig-btn');
+            
+            const sterneAnzeige = document.getElementById('sterne-anzeige');
+            const scoreAnzeige = document.getElementById('score-anzeige');
+            const neueRundeBtn = document.getElementById('neue-runde-btn');
+            
+            [document.getElementById('einstellungen-btn-spiel'), document.getElementById('einstellungen-btn-auswertung')].forEach(btn => {
+                btn.addEventListener('click', zeigeEinstellungen);
+            });
+
+            // --- App-Zustand (State) ---
+            const state = {
+                gelernteBuchstaben: [],
+                vokale: [],
+                konsonanten: [],
+                maxSilben: 3,
+                worteProRunde: 10,
+                silbenFaerben: false,
+                aktuellesWortIndex: 0,
+                korrektGelesen: 0,
+                aktuellesWort: '', 
+                aktuellesWortSilben: []
+            };
+
+            const alleBuchstaben = [
+                'A', 'E', 'I', 'O', 'U', 
+                'L', 'M', 'N', 'R', 'S', 'F', 'W', 
+                'P', 'T', 'K', 'B', 'D', 'G', 'H', 'Z', 'J', 'V', 'C', 'X', 'Y', 'Q',
+                'EI', 'AU', 'EU', 'SCH', 'CH'
+            ];
+            const VOKAL_LISTE = ['A', 'E', 'I', 'O', 'U'];
+
+            // --- Sprach-Synthese (Fehlertolerant) ---
+            const synth = window.speechSynthesis;
+            let germanVoice = null;
+
+            function ladeStimmen() {
+                if (!synth) return;
+                try {
+                    const voices = synth.getVoices();
+                    germanVoice = voices.find(v => v.lang === 'de-DE' || v.lang.startsWith('de-'));
+                    if (!germanVoice && voices.length > 0) {
+                        germanVoice = voices.find(v => v.lang.startsWith('de')) || voices[0];
+                    }
+                } catch (error) {
+                    console.warn("Sprachsynthese-Stimmen konnten nicht geladen werden:", error);
+                }
+            }
+            
+            if (synth) {
+                ladeStimmen();
+                if (synth.onvoiceschanged !== undefined) {
+                    synth.onvoiceschanged = ladeStimmen;
+                }
+            }
+
+            function sprech(text) {
+                if (!synth || !synth.speak) {
+                    console.warn("Sprachsynthese wird nicht unterstützt.");
+                    return;
+                }
+                try {
+                    if (synth.speaking) synth.cancel();
+                    const utter = new SpeechSynthesisUtterance(text);
+                    utter.lang = 'de-DE';
+                    if (germanVoice) utter.voice = germanVoice;
+                    utter.rate = 0.9;
+                    synth.speak(utter);
+                } catch (error) {
+                    console.error("Fehler bei der Sprachausgabe:", error);
+                }
+            }
+
+
+            // --- Ansichten-Wechsler ---
+            function zeigeAnsicht(ansichtName) {
+                Object.values(views).forEach(view => view.classList.add('hidden'));
+                if (views[ansichtName]) {
+                    views[ansichtName].classList.remove('hidden');
+                }
+            }
+
+            function zeigeEinstellungen() {
+                zeigeAnsicht('einstellungen');
+            }
+
+            function zeigeSpiel() {
+                if (!einstellungenValidieren()) return;
+                
+                // Einstellungen speichern
+                state.gelernteBuchstaben = Array.from(buchstabenContainer.querySelectorAll('input:checked'))
+                                                .map(cb => cb.value);
+                state.maxSilben = parseInt(maxSilbenInput.value, 10);
+                state.worteProRunde = parseInt(worteProRundeInput.value, 10);
+                state.silbenFaerben = silbenFaerbenCheckbox.checked;
+                
+                // Vokale und Konsonanten trennen
+                state.vokale = state.gelernteBuchstaben.filter(b => VOKAL_LISTE.includes(b.toUpperCase()) || ['EI', 'AU', 'EU'].includes(b.toUpperCase()));
+                state.konsonanten = state.gelernteBuchstaben.filter(b => !state.vokale.includes(b));
+
+                // *** NEU: Einstellungen in localStorage speichern ***
+                saveSettings();
+
+                // Spiel zurücksetzen
+                state.aktuellesWortIndex = 0;
+                state.korrektGelesen = 0;
+                
+                // GEÄNDERTE REIHENFOLGE:
+                // 1. Zuerst die Ansicht wechseln, damit das Element eine Breite hat
+                zeigeAnsicht('spiel');
+                // 2. Dann die Runde starten (was das Wort generiert & skaliert)
+                starteRunde();
+            }
+            
+            function zeigeAuswertung() {
+                // Sterne berechnen
+                const prozent = (state.korrektGelesen / state.worteRunde) * 100;
+                let sterne = 0;
+                if (prozent < 20) sterne = 1;
+                else if (prozent < 40) sterne = 2;
+                else if (prozent < 60) sterne = 3;
+                else if (prozent < 80) sterne = 4;
+                else sterne = 5;
+
+                sterneAnzeige.textContent = '⭐'.repeat(sterne) + '☆'.repeat(5 - sterne);
+                scoreAnzeige.textContent = `Du hast ${state.korrektGelesen} von ${state.worteProRunde} Wörtern richtig gelesen.`;
+                
+                zeigeAnsicht('auswertung');
+            }
+
+            // NEU: Funktion zum Anpassen der Schriftgröße
+            function adjustFontSize() {
+                const container = document.getElementById('wort-container');
+                const wordElement = document.getElementById('wort-anzeige');
+                
+                // Nicht anpassen, wenn die Elemente nicht sichtbar sind oder kein Wort da ist
+                if (!container || !wordElement || container.clientWidth === 0 || !state.aktuellesWort) {
+                    return; 
+                }
+
+                const containerWidth = container.clientWidth; // Breite des Containers INKL. Padding (p-6)
+                
+                <!-- GEÄNDERT: Reset auf maximale Schriftgröße (6rem) -->
+                let currentFontSize = 6; 
+                wordElement.style.fontSize = `${currentFontSize}rem`;
+
+                // 2. Verkleinern, bis es passt
+                // Vergleiche scrollWidth (was das Element braucht) mit clientWidth (was der Container hat)
+                while (wordElement.scrollWidth > containerWidth && currentFontSize > 1) {
+                    currentFontSize -= 0.2; // In kleineren Schritten verkleinern
+                    wordElement.style.fontSize = `${currentFontSize}rem`;
+                }
+            }
+
+            // *** NEU: Funktion zum Speichern der Einstellungen ***
+            function saveSettings() {
+                try {
+                    const settings = {
+                        buchstaben: state.gelernteBuchstaben,
+                        maxSilben: maxSilbenInput.value,
+                        worteProRunde: worteProRundeInput.value,
+                        silbenFaerben: silbenFaerbenCheckbox.checked
+                    };
+                    localStorage.setItem('leseAppEinstellungen', JSON.stringify(settings));
+                } catch (e) {
+                    console.warn("LocalStorage ist nicht verfügbar oder voll:", e);
+                }
+            }
+
+            // *** NEU: Funktion zum Laden der Einstellungen ***
+            function loadSettings() {
+                try {
+                    const settingsString = localStorage.getItem('leseAppEinstellungen');
+                    if (settingsString) {
+                        const settings = JSON.parse(settingsString);
+                        return settings;
+                    }
+                } catch (e) {
+                    console.warn("Fehler beim Laden der Einstellungen aus LocalStorage:", e);
+                }
+                return null; // Keine Einstellungen gefunden
+            }
+
+
+            // --- Wort-Generator (ANGEPASST) ---
+            function generiereWort() {
+                const silbenAnzahl = Math.floor(Math.random() * state.maxSilben) + 1;
+                let silben = [];
+                let letzteSilbeWarEinzelVokal = false; 
+
+                for (let i = 0; i < silbenAnzahl; i++) {
+                    const neueSilbe = generiereSilbe(letzteSilbeWarEinzelVokal); 
+                    silben.push(neueSilbe);
+                    
+                    let istEinzelVokal = (neueSilbe.length === 1 && VOKAL_LISTE.includes(neueSilbe.toUpperCase()));
+                    let istDiphthong = (['ei', 'au', 'eu'].includes(neueSilbe.toLowerCase()));
+                    
+                    letzteSilbeWarEinzelVokal = istEinzelVokal && !istDiphthong;
+                }
+                
+                return silben; 
+            }
+            
+            function generiereSilbe(forceKonsonant = false) {
+                const { vokale, konsonanten } = state;
+                const hatVokale = vokale.length > 0;
+                const hatKonsonanten = konsonanten.length > 0;
+
+                const randomAus = (arr) => arr[Math.floor(Math.random() * arr.length)];
+                
+                const strukturTyp = Math.random();
+                
+                if ((strukturTyp < 0.7 || forceKonsonant) && hatKonsonanten && hatVokale) {
+                    // KV (Konsonant-Vokal)
+                    return (randomAus(konsonanten) + randomAus(vokale)).toLowerCase();
+                } else if (hatVokale) {
+                    // V (Vokal)
+                    return randomAus(vokale).toLowerCase();
+                } else if (hatKonsonanten) {
+                    // Fallback
+                    return randomAus(konsonanten).toLowerCase();
+                }
+                return '';
+            }
+
+            // --- Spiel-Logik ---
+            function starteRunde() {
+                state.aktuellesWortIndex = 0;
+                state.korrektGelesen = 0;
+                zeigeNaechstesWort();
+            }
+            
+            function zeigeNaechstesWort() {
+                if (state.aktuellesWortIndex >= state.worteProRunde) {
+                    zeigeAuswertung();
+                    return;
+                }
+                
+                state.aktuellesWortIndex++;
+                fortschrittText.textContent = `Wort ${state.aktuellesWortIndex} von ${state.worteProRunde}`;
+                
+                state.aktuellesWortSilben = generiereWort(); 
+                
+                if (state.aktuellesWortSilben.length > 0) {
+                    let ersteSilbe = state.aktuellesWortSilben[0];
+                    state.aktuellesWortSilben[0] = ersteSilbe.charAt(0).toUpperCase() + ersteSilbe.slice(1);
+                }
+                
+                state.aktuellesWort = state.aktuellesWortSilben.join(''); 
+
+                // Wort-Anzeige
+                wortAnzeige.innerHTML = ''; 
+                const farben = ['text-blue-600', 'text-red-600'];
+                
+                state.aktuellesWortSilben.forEach((silbe, index) => {
+                    const span = document.createElement('span');
+                    span.textContent = silbe;
+                    span.className = 'syllable-span'; 
+                    
+                    if (state.silbenFaerben) {
+                        span.classList.add(farben[index % 2]);
+                    }
+                    
+                    wortAnzeige.appendChild(span);
+                });
+
+                // NEU: Schriftgröße anpassen, nachdem das Wort im DOM ist
+                adjustFontSize();
+            }
+
+            // --- Initialisierung ---
+            function init() {
+                // *** NEU: Einstellungen laden ***
+                const geladeneEinstellungen = loadSettings();
+                let standardBuchstaben = ['A', 'M', 'O', 'L', 'I'];
+                let standardSilbenFaerben = true; // Entspricht 'checked' im HTML
+
+                if (geladeneEinstellungen) {
+                    standardBuchstaben = geladeneEinstellungen.buchstaben || standardBuchstaben;
+                    maxSilbenInput.value = geladeneEinstellungen.maxSilben || "3";
+                    worteProRundeInput.value = geladeneEinstellungen.worteProRunde || "10";
+                    // Lese den Wert (könnte undefined sein, wenn alte Settings gespeichert wurden)
+                    if (geladeneEinstellungen.silbenFaerben !== undefined) {
+                        standardSilbenFaerben = geladeneEinstellungen.silbenFaerben;
+                    }
+                }
+                
+                // *** NEU: Setze den Haken basierend auf geladenem/Standardwert ***
+                silbenFaerbenCheckbox.checked = standardSilbenFaerben;
+
+
+                // Buchstaben-Checkboxen erstellen
+                buchstabenContainer.innerHTML = '';
+                alleBuchstaben.forEach(b => {
+                    const inputId = `cb-${b}`;
+                    const label = document.createElement('label');
+                    label.htmlFor = inputId;
+                    
+                    const input = document.createElement('input');
+                    input.type = 'checkbox';
+                    input.id = inputId;
+                    input.value = b;
+                    input.className = 'buchstaben-input';
+                    
+                    // *** GEÄNDERT: Prüfe gegen geladene/Standard-Buchstaben ***
+                    if (standardBuchstaben.includes(b)) {
+                        input.checked = true;
+                    }
+                    
+                    const span = document.createElement('span');
+                    span.className = 'buchstaben-label';
+                    span.textContent = b;
+                    
+                    label.appendChild(input);
+                    label.appendChild(span);
+                    buchstabenContainer.appendChild(label);
+                });
+
+                // --- Event Listeners ---
+                startBtn.addEventListener('click', zeigeSpiel);
+                
+                if (!synth) {
+                    vorlesenBtn.classList.add('hidden');
+                } else {
+                    vorlesenBtn.addEventListener('click', () => {
+                        sprech(state.aktuellesWort);
+                    });
+                }
+                
+                ueberspringenBtn.addEventListener('click', zeigeNaechstesWort);
+                
+                richtigBtn.addEventListener('click', () => {
+                    state.korrektGelesen++;
+                    zeigeNaechstesWort();
+                });
+                
+                neueRundeBtn.addEventListener('click', () => {
+                    starteRunde();
+                    zeigeAnsicht('spiel');
+                });
+
+                zeigeEinstellungen();
+
+                // NEU: Listener für Fenstergrößenänderung
+                window.addEventListener('resize', adjustFontSize);
+            }
+            
+            function einstellungenValidieren() {
+                const gewaehlteBuchstaben = buchstabenContainer.querySelectorAll('input:checked');
+                
+                const hatVokal = Array.from(gewaehlteBuchstaben).some(cb => 
+                    VOKAL_LISTE.includes(cb.value.toUpperCase()) || ['EI', 'AU', 'EU'].includes(cb.value.toUpperCase())
+                );
+
+                if (!hatVokal) {
+                    fehlerMeldung.textContent = 'Bitte wähle mindestens einen Vokal (A, E, I, O, U...).';
+                    fehlerMeldung.classList.remove('hidden');
+                    return false;
+                }
+                
+                fehlerMeldung.classList.add('hidden');
+                return true;
+            }
+
+            // App starten
+            init();
+        });
+    </script>
+</body>
+</html>
+
+
+
+
+
