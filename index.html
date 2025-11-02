@@ -1,465 +1,432 @@
 <!DOCTYPE html>
 <html lang="de">
 <head>
-    <meta charset="UTF-CS-8">
+    <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>Lese-Lern-App</title>
     <!-- Tailwind CSS -->
     <script src="https://cdn.tailwindcss.com"></script>
-    
+    <!-- Three.js Bibliothek -->
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/three.js/r128/three.min.js"></script>
+    <!-- Cannon.js (Physik-Engine) -->
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/cannon.js/0.6.2/cannon.min.js"></script>
+
     <!-- Google Font: Playwrite DE Grund -->
     <link rel="preconnect" href="https://fonts.googleapis.com">
     <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
     <link href="https://fonts.googleapis.com/css2?family=Playwrite+DE+Grund:wght@100..400&display=swap" rel="stylesheet">
-    
     <style>
-        /* Wende die Grundschrift auf die gesamte App an */
         body {
             font-family: 'Playwrite DE Grund', cursive;
+            overscroll-behavior: none; /* Verhindert "pull-to-refresh" auf Mobilgeräten */
         }
-
-        /* Verstecke die Scrollleiste im Wort-Container, aber erlaube das Scrollen (als Fallback) */
-        #wort-container::-webkit-scrollbar {
-            display: none; /* Chrome, Safari, Opera */
+        /* Verhindert, dass Zahlen-Inputs Pfeile anzeigen */
+        input[type=number]::-webkit-inner-spin-button,
+        input[type=number]::-webkit-outer-spin-button {
+            -webkit-appearance: none;
+            margin: 0;
         }
-        #wort-container {
-            -ms-overflow-style: none;  /* IE und Edge */
-            scrollbar-width: none;  /* Firefox */
-        }
-
-        /* Benutzerdefinierte Stile für Checkboxen, damit sie besser aussehen */
-        .buchstaben-input {
-            width: 1.5rem;
-            height: 1.5rem;
-            accent-color: #3b82f6; /* Blau */
-        }
-        
-        /* Stellt sicher, dass der App-Container die Höhe des Viewports nutzt,
-           besonders auf Mobilgeräten wichtig, um die Buttons nach unten zu schieben. */
-        html, body {
-            height: 100%;
-            overflow: hidden; /* Verhindert Bouncing auf Mobilgeräten */
-        }
-        #app-container {
-            height: 100vh; /* Nutzt die volle Viewport-Höhe */
-            display: flex;
-            flex-direction: column;
+        input[type=number] {
+            -moz-appearance: textfield;
         }
     </style>
 </head>
-<body class="bg-gray-100 dark:bg-gray-900 text-gray-900 dark:text-white flex items-center justify-center p-4">
+<body class="bg-white text-gray-900 w-screen h-screen overflow-hidden flex flex-col">
 
-    <!-- Haupt-Container der App -->
-    <div id="app-container" class="w-full max-w-lg mx-auto bg-white dark:bg-gray-800 rounded-2xl shadow-xl overflow-hidden">
+    <!-- Hauptcontainer -->
+    <div id="app" class="w-full h-full flex flex-col">
 
         <!-- 1. Startbildschirm (Einstellungen) -->
-        <div id="startbildschirm" class="p-6 md:p-8 flex flex-col h-full">
-            <h1 class="text-3xl font-bold text-center text-blue-600 dark:text-blue-400 mb-6">Lese-App</h1>
-            
-            <form id="einstellungs-form" class="flex-grow flex flex-col overflow-y-auto">
-                
-                <div class="flex-grow space-y-6">
-                    <!-- Buchstabenauswahl -->
-                    <div>
-                        <label class="block text-lg font-semibold mb-3">Gelernte Buchstaben:</label>
-                        <div id="buchstaben-container" class="grid grid-cols-5 sm:grid-cols-6 gap-4">
-                            <!-- Checkboxen werden hier per JS eingefügt -->
+        <div id="startbildschirm" class="flex flex-col h-full p-4 md:p-8">
+            <h1 class="text-3xl md:text-4xl font-bold text-center text-blue-600 mb-6">Lese-Training</h1>
+
+            <!-- Scrollbarer Inhaltsbereich -->
+            <div class="flex-grow overflow-y-auto pb-24"> <!-- Padding unten für den Sticky Button -->
+                <!-- Gelernte Buchstaben -->
+                <fieldset class="mb-6">
+                    <legend class="text-base font-semibold mb-3">Gelernte Buchstaben:</legend>
+                    <div id="buchstaben-container" class="grid grid-cols-5 sm:grid-cols-8 md:grid-cols-10 lg:grid-cols-12 gap-2">
+                        <!-- Checkboxen werden per JS eingefügt -->
+                    </div>
+                </fieldset>
+
+                <!-- Einstellungen -->
+                <fieldset class="grid grid-cols-1 md:grid-cols-2 gap-x-8 gap-y-4">
+                    <legend class="text-base font-semibold mb-3 col-span-1 md:col-span-2">Einstellungen:</legend>
+
+                    <!-- Optionen Grid -->
+                    <div class="grid grid-cols-3 gap-x-4 gap-y-2 col-span-1 md:col-span-2">
+                        <div>
+                            <label for="min-silben" class="block text-sm font-medium text-gray-700">Min. Silben</label>
+                            <input type="number" id="min-silben" value="2" min="1" max="5" class="mt-1 w-full text-center border-gray-300 rounded-md shadow-sm focus:border-blue-500 focus:ring-blue-500 text-base">
+                        </div>
+                        <div>
+                            <label for="max-silben" class="block text-sm font-medium text-gray-700">Max. Silben</label>
+                            <input type="number" id="max-silben" value="3" min="1" max="5" class="mt-1 w-full text-center border-gray-300 rounded-md shadow-sm focus:border-blue-500 focus:ring-blue-500 text-base">
+                        </div>
+                        <div>
+                            <label for="woerter-pro-runde" class="block text-sm font-medium text-gray-700">Wörter</label>
+                            <input type="number" id="woerter-pro-runde" value="10" min="1" max="50" class="mt-1 w-full text-center border-gray-300 rounded-md shadow-sm focus:border-blue-500 focus:ring-blue-500 text-base">
                         </div>
                     </div>
-
-                    <!-- Weitere Einstellungen -->
-                    <div class="space-y-4">
-                        <div>
-                            <label for="min-silben" class="block text-lg font-semibold mb-2">Minimale Silben:</label>
-                            <input type="number" id="min-silben" value="2" min="1" max="5" class="w-full p-3 border border-gray-300 dark:border-gray-600 rounded-lg bg-gray-50 dark:bg-gray-700 text-lg">
+                    
+                    <!-- Checkboxen -->
+                    <div class="space-y-3 col-span-1 md:col-span-2 mt-4">
+                        <div class="relative flex items-start">
+                            <div class="flex h-6 items-center">
+                                <input id="silben-faerben" type="checkbox" checked class="h-5 w-5 rounded border-gray-300 text-blue-600 focus:ring-blue-500">
+                            </div>
+                            <div class="ml-3 text-base leading-6">
+                                <label for="silben-faerben" class="font-medium">Silben abwechselnd einfärben (blau/rot)</label>
+                            </div>
                         </div>
-
-                        <div>
-                            <label for="max-silben" class="block text-lg font-semibold mb-2">Maximale Silben:</label>
-                            <input type="number" id="max-silben" value="3" min="1" max="5" class="w-full p-3 border border-gray-300 dark:border-gray-600 rounded-lg bg-gray-50 dark:bg-gray-700 text-lg">
-                        </div>
-                        
-                        <div>
-                            <label for="worte-pro-runde" class="block text-lg font-semibold mb-2">Wörter pro Runde:</label>
-                            <input type="number" id="worte-pro-runde" value="10" min="1" max="50" class="w-full p-3 border border-gray-300 dark:border-gray-600 rounded-lg bg-gray-50 dark:bg-gray-700 text-lg">
-                        </div>
-
-                        <!-- Silbenfärbung -->
-                        <div class="flex items-center justify-between mt-4">
-                            <label for="silben-faerben" class="text-lg font-semibold">Silben abwechselnd einfärben:</label>
-                            <input type="checkbox" id="silben-faerben" checked class="buchstaben-input">
-                        </div>
-
-                        <div class="flex items-center justify-between mt-4">
-                            <label for="silben-abstand" class="text-lg font-semibold">Silbenabstand anzeigen:</label>
-                            <input type="checkbox" id="silben-abstand" class="buchstaben-input"> <!-- Standard ist 'unchecked' (aus) -->
+                        <div class="relative flex items-start">
+                            <div class="flex h-6 items-center">
+                                <input id="silben-abstand" type="checkbox" class="h-5 w-5 rounded border-gray-300 text-blue-600 focus:ring-blue-500">
+                            </div>
+                            <div class="ml-3 text-base leading-6">
+                                <label for="silben-abstand" class="font-medium">Silbenabstand anzeigen</label>
+                            </div>
                         </div>
                     </div>
-                </div>
+                </fieldset>
+            </div>
 
-                <!-- Start Button -->
-                <button type="submit" class="w-full bg-blue-600 hover:bg-blue-700 text-white font-bold text-2xl py-4 px-6 rounded-xl shadow-lg transition duration-200 mt-8">
+            <!-- Fester "Start!" Button am unteren Rand -->
+            <div class="absolute bottom-0 left-0 right-0 p-4 bg-white border-t border-gray-200">
+                <button id="start-button" class="w-full bg-blue-600 hover:bg-blue-700 text-white font-bold text-2xl py-4 px-6 rounded-lg shadow-md transition-transform duration-150 ease-in-out active:scale-95">
                     Start!
                 </button>
-            </form>
+            </div>
         </div>
 
         <!-- 2. Spielbildschirm -->
-        <!-- START ÄNDERUNG: "relative" hinzugefügt, damit das Icon positioniert werden kann -->
-        <div id="spiel" class="hidden p-6 md:p-8 flex flex-col h-full relative">
-            
-            <!-- START ÄNDERUNG: Burger-Menü-Button hinzugefügt -->
-            <button id="einstellungen-button" class="absolute top-6 right-6 text-gray-500 dark:text-gray-400 hover:text-blue-600 dark:hover:text-blue-400 transition duration-200 z-10">
-                <svg xmlns="http://www.w3.org/2000/svg" class="h-8 w-8" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2">
-                    <path stroke-linecap="round" stroke-linejoin="round" d="M4 6h16M4 12h16m-8 6h8" />
-                </svg>
-            </button>
-            <!-- END ÄNDERUNG -->
-
-            <!-- Wort-Anzeige (Oberes Drittel) -->
-            <div class="flex-shrink-0 flex items-center justify-center min-h-[40vh]">
-                <div id="wort-container" class="text-center font-bold whitespace-nowrap overflow-x-auto" style="font-size: 4.5rem; line-height: 1.2;">
-                    <!-- Wort wird hier per JS eingefügt -->
-                </div>
+        <div id="spiel" class="hidden flex-grow flex-col h-full w-full p-4 overflow-hidden">
+            <!-- Burger-Menü-Button -->
+            <div class="absolute top-4 right-4 z-20">
+                <button id="einstellungen-button" class="text-gray-500 hover:text-blue-600">
+                    <svg class="w-8 h-8" fill="none" stroke="currentColor" viewBox="0 0 24 24" xmlns="http://www.w3.org/2000/svg"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 6h16M4 12h16m-7 6h7"></path></svg>
+                </button>
             </div>
 
-            <!-- Spacer (schiebt Buttons nach unten) -->
-            <div class="flex-grow"></div>
+            <!-- Wortanzeige (Oben) -->
+            <div id="wort-anzeige-container" class="w-full text-center pt-8 pb-4" style="min-height: 100px;">
+                <span id="wort-anzeige" class="font-bold whitespace-nowrap" style="font-size: 4.5rem; line-height: 1.2;"></span>
+            </div>
 
-            <!-- Spiel-Buttons (Unteres Drittel) -->
-            <div id="spiel-buttons" class="flex flex-col md:flex-row gap-4 justify-center flex-shrink-0">
-                <button id="richtig-button" class="bg-green-600 hover:bg-green-700 text-white font-bold py-4 px-6 rounded-xl shadow-lg transition duration-200 text-xl w-full">
-                    Richtig gelesen
-                </button>
-                <button id="ueberspringen-button" class="bg-yellow-500 hover:bg-yellow-600 text-white font-bold py-4 px-6 rounded-xl shadow-lg transition duration-200 text-xl w-full">
-                    Überspringen
-                </button>
+            <!-- 3D Canvas Container (Mitte) -->
+            <div id="3d-canvas-container" class="flex-grow w-full h-full relative overflow-hidden">
+                <!-- Renderer wird hier per JS eingefügt -->
+            </div>
+
+            <!-- Buttons (Unten) -->
+            <div class="w-full pt-4 pb-4 space-y-3 md:space-y-0 md:flex md:space-x-4 md:pb-4">
+                <button id="ueberspringen-button" class="w-full md:w-1/2 bg-gray-200 hover:bg-gray-300 text-gray-700 font-bold text-lg md:text-xl py-3 md:py-4 px-4 rounded-lg shadow transition-transform duration-150 ease-in-out active:scale-95">Überspringen</button>
+                <button id="richtig-button" class="w-full md:w-1/2 bg-green-500 hover:bg-green-600 text-white font-bold text-lg md:text-xl py-3 md:py-4 px-4 rounded-lg shadow transition-transform duration-150 ease-in-out active:scale-95">Richtig gelesen</button>
+            </div>
+
+            <!-- Fortschrittsanzeige (Oben) -->
+            <div id="fortschritt-anzeige" class="w-full text-center text-gray-500 text-sm absolute top-4 left-4">
+                Wort <span id="aktuelles-wort-nr">1</span> / <span id="max-woerter-nr">10</span>
             </div>
         </div>
 
         <!-- 3. Auswertungsbildschirm -->
-        <div id="auswertung" class="hidden p-6 md:p-8 flex flex-col h-full justify-between">
-            <h2 class="text-3xl font-bold text-center text-blue-600 dark:text-blue-400">Super!</h2>
-            
-            <div class="text-center my-8">
-                <p class="text-xl mb-4">Deine Bewertung:</p>
-                <div id="sterne-bewertung" class="text-5xl text-yellow-400 text-center">
-                    <!-- Sterne werden hier per JS eingefügt -->
-                </div>
+        <div id="auswertung" class="hidden flex-col h-full justify-center items-center text-center p-4">
+            <h2 class="text-4xl font-bold text-blue-600 mb-8">Super!</h2>
+            <div id="sterne-anzeige" class="text-5xl text-yellow-400 mb-12">
+                <!-- Sterne werden per JS eingefügt -->
             </div>
-
-            <button id="zurueck-button" class="w-full bg-blue-600 hover:bg-blue-700 text-white font-bold text-2xl py-4 px-6 rounded-xl shadow-lg transition duration-200">
-                Zurück zum Menü
-            </button>
+            <p id="auswertung-text" class="text-xl mb-12">Du hast <span id="richtige-woerter-anzahl">0</span> von <span id="max-woerter-anzahl">10</span> Wörtern richtig gelesen.</p>
+            <button id="zurueck-button" class="w-full max-w-sm bg-blue-600 hover:bg-blue-700 text-white font-bold text-2xl py-4 px-6 rounded-lg shadow-md transition-transform duration-150 ease-in-out active:scale-95">Nochmal!</button>
         </div>
-
     </div>
 
-
     <script>
-        // --- Konstanten ---
-        const VOKAL_LISTE = ['A', 'E', 'I', 'O', 'U'];
-        const KONSONANT_LISTE = ['B', 'D', 'F', 'G', 'H', 'K', 'L', 'M', 'N', 'P', 'R', 'S', 'T', 'W'];
-        const DIPHTHONGE_LISTE = ['EI', 'AU', 'EU'];
-        const ALLE_BUCHSTABEN = [...VOKAL_LISTE, ...KONSONANT_LISTE, ...DIPHTHONGE_LISTE].sort();
-
-        // --- Globaler State ---
-        const state = {
-            gelernteBuchstaben: [],
-            vokale: [],
-            konsonanten: [],
-            diphthonge: [],
-            minSilben: 2,
-            maxSilben: 3,
-            worteProRunde: 10,
-            aktuellesWortIndex: 0,
-            richtigGezählt: 0,
-            aktuellesWort: [], 
-            silbenFaerben: true,
-            silbenAbstand: false,
-            gezeigteWorte: []
-        };
-
-        // --- DOM-Elemente ---
+        // --- Globale Elemente ---
         const startbildschirm = document.getElementById('startbildschirm');
         const spiel = document.getElementById('spiel');
         const auswertung = document.getElementById('auswertung');
         
-        const startForm = document.getElementById('einstellungs-form');
+        const startButton = document.getElementById('start-button');
         const buchstabenContainer = document.getElementById('buchstaben-container');
         const minSilbenInput = document.getElementById('min-silben');
         const maxSilbenInput = document.getElementById('max-silben');
-        const worteProRundeInput = document.getElementById('worte-pro-runde');
+        const woerterProRundeInput = document.getElementById('woerter-pro-runde');
         const silbenFaerbenCheckbox = document.getElementById('silben-faerben');
         const silbenAbstandCheckbox = document.getElementById('silben-abstand');
         
-        const wortContainer = document.getElementById('wort-container');
+        const wortContainer = document.getElementById('wort-anzeige');
         const richtigButton = document.getElementById('richtig-button');
         const ueberspringenButton = document.getElementById('ueberspringen-button');
-        const einstellungenButton = document.getElementById('einstellungen-button'); // START ÄNDERUNG
+        const einstellungenButton = document.getElementById('einstellungen-button');
         
-        const sterneBewertung = document.getElementById('sterne-bewertung');
+        const fortschrittAnzeige = document.getElementById('fortschritt-anzeige');
+        const aktuellesWortNr = document.getElementById('aktuelles-wort-nr');
+        const maxWoerterNr = document.getElementById('max-woerter-nr');
+
+        const sterneAnzeige = document.getElementById('sterne-anzeige');
+        const auswertungText = document.getElementById('auswertung-text');
+        const richtigeWoerterAnzahl = document.getElementById('richtige-woerter-anzahl');
+        const maxWoerterAnzahl = document.getElementById('max-woerter-anzahl');
         const zurueckButton = document.getElementById('zurueck-button');
 
-        // --- Event Listeners ---
-        document.addEventListener('DOMContentLoaded', init);
-        startForm.addEventListener('submit', zeigeSpiel);
-        richtigButton.addEventListener('click', () => handleWort(true));
-        ueberspringenButton.addEventListener('click', () => handleWort(false));
-        zurueckButton.addEventListener('click', zeigeStartbildschirm);
-        einstellungenButton.addEventListener('click', zeigeStartbildschirm); // START ÄNDERUNG
-        
-        window.addEventListener('resize', () => {
-            if (spiel.classList.contains('hidden')) return;
-            adjustFontSize();
-        });
+        // --- Three.js Globale Variablen ---
+        let scene, camera, renderer, towerGroup, star;
+        let cubes = []; // Array für {mesh, body} Paare
+        let fallingCubes = []; // Array für fallende {mesh, body} Paare
+        let world, groundMaterial, cubeMaterial; // Cannon.js Variablen
+        const STAR_DIM_COLOR = 0x888800;
+        const STAR_LIT_COLOR = 0xFFFF00;
+        const MAX_TOWER_HEIGHT = 10; // Max Würfel
 
+
+        // --- App-Zustand (State) ---
+        const state = {
+            vokale: [],
+            konsonanten: [],
+            diphthonge: [],
+            gelernteBuchstaben: [],
+            minSilben: 2,
+            maxSilben: 3,
+            woerterProRunde: 10,
+            silbenFaerben: true,
+            silbenAbstand: false,
+            
+            aktuelleRunde: 0,
+            richtigGelesen: 0,
+            generierteWoerterRunde: new Set() // Verhindert Duplikate in einer Runde
+        };
+
+        // --- Konstanten ---
+        const ALLE_BUCHSTABEN = [
+            // Vokale
+            'A', 'E', 'I', 'O', 'U', 'Ä', 'Ö', 'Ü',
+            // Diphthonge (als Einheit behandeln)
+            'Ei', 'Ai', 'Eu', 'Au',
+            // Konsonanten
+            'B', 'C', 'D', 'F', 'G', 'H', 'J', 'K', 'L', 'M', 'N', 'P', 'Q', 'R', 'S', 'T', 'V', 'W', 'X', 'Y', 'Z',
+            'Ch', 'Sch', 'Ck'
+        ];
+        const VOKALE_LISTE = ['A', 'E', 'I', 'O', 'U', 'Ä', 'Ö', 'Ü'];
+        const DIPHTHONGE_LISTE = ['Ei', 'Ai', 'Eu', 'Au'];
 
         // --- Initialisierung ---
-        function init() {
-            // Einstellungen laden
-            const geladeneEinstellungen = loadSettings();
-            let standardBuchstaben = ['A', 'M', 'O', 'L', 'I'];
-            let standardSilbenFaerben = true;
-            let standardSilbenAbstand = false;
-            let standardMinSilben = "2";
-            let standardMaxSilben = "3";
+        document.addEventListener('DOMContentLoaded', () => {
+            initBuchstaben();
+            ladeEinstellungen();
             
-            if (geladeneEinstellungen) {
-                standardBuchstaben = geladeneEinstellungen.buchstaben || standardBuchstaben;
-                standardMinSilben = geladeneEinstellungen.minSilben || "2";
-                standardMaxSilben = geladeneEinstellungen.maxSilben || "3";
-                worteProRundeInput.value = geladeneEinstellungen.worteProRunde || "10";
-                if (geladeneEinstellungen.silbenFaerben !== undefined) {
-                    standardSilbenFaerben = geladeneEinstellungen.silbenFaerben;
-                }
-                if (geladeneEinstellungen.silbenAbstand !== undefined) {
-                    standardSilbenAbstand = geladeneEinstellungen.silbenAbstand;
-                }
-            }
+            startButton.addEventListener('click', zeigeSpiel);
+            richtigButton.addEventListener('click', () => handleWort(true));
+            ueberspringenButton.addEventListener('click', () => handleWort(false));
+            einstellungenButton.addEventListener('click', zeigeStartbildschirm);
+            zurueckButton.addEventListener('click', zeigeStartbildschirm);
             
-            minSilbenInput.value = standardMinSilben;
-            maxSilbenInput.value = standardMaxSilben;
-            silbenFaerbenCheckbox.checked = standardSilbenFaerben;
-            silbenAbstandCheckbox.checked = standardSilbenAbstand;
+            // Event Listener für 3D-Canvas Resize
+            window.addEventListener('resize', resize3DCanvas);
+        });
 
-            // Buchstaben-Checkboxen erstellen
-            buchstabenContainer.innerHTML = '';
+        function initBuchstaben() {
             ALLE_BUCHSTABEN.forEach(b => {
-                const id = `cb-${b}`;
                 const div = document.createElement('div');
-                div.className = 'flex items-center gap-2';
-                
+                div.className = 'flex items-center';
                 const input = document.createElement('input');
                 input.type = 'checkbox';
-                input.id = id;
+                input.id = `cb-${b}`;
                 input.value = b;
-                input.className = 'buchstaben-input';
-                if (standardBuchstaben.includes(b)) {
-                    input.checked = true;
-                }
-                
+                input.className = 'h-5 w-5 rounded border-gray-300 text-blue-600 focus:ring-blue-500';
                 const label = document.createElement('label');
-                label.htmlFor = id;
+                label.htmlFor = `cb-${b}`;
                 label.textContent = b;
-                label.className = 'text-lg font-medium';
-                
+                label.className = 'ml-2 text-base font-medium';
                 div.appendChild(input);
                 div.appendChild(label);
                 buchstabenContainer.appendChild(div);
             });
         }
-
-        // --- LocalStorage Funktionen ---
-        function saveSettings() {
-            try {
-                const settings = {
-                    buchstaben: state.gelernteBuchstaben,
-                    minSilben: minSilbenInput.value,
-                    maxSilben: maxSilbenInput.value,
-                    worteProRunde: worteProRundeInput.value,
-                    silbenFaerben: silbenFaerbenCheckbox.checked,
-                    silbenAbstand: silbenAbstandCheckbox.checked
-                };
-                localStorage.setItem('leseAppEinstellungen', JSON.stringify(settings));
-            } catch (e) {
-                console.warn("LocalStorage ist nicht verfügbar oder voll:", e);
-            }
+        
+        function zeigeStartbildschirm() {
+            startbildschirm.classList.remove('hidden');
+            startbildschirm.classList.add('flex');
+            spiel.classList.add('hidden');
+            spiel.classList.remove('flex');
+            auswertung.classList.add('hidden');
+            auswertung.classList.remove('flex');
         }
 
-        function loadSettings() {
-            try {
-                const settingsString = localStorage.getItem('leseAppEinstellungen');
-                if (settingsString) {
-                    return JSON.parse(settingsString);
-                }
-            } catch (e) {
-                console.warn("Fehler beim Laden der Einstellungen aus LocalStorage:", e);
+        function zeigeSpiel() {
+            // 1. Einstellungen auslesen und speichern
+            updateStateFromUI();
+            speichereEinstellungen();
+
+            // 2. Spiel-Zustand zurücksetzen
+            state.aktuelleRunde = 0;
+            state.richtigGelesen = 0;
+            state.generierteWoerterRunde.clear();
+            resetTower(); // 3D-Turm zurücksetzen
+
+            // 3. UI umschalten (WICHTIG: *VOR* der 3D-Init!)
+            startbildschirm.classList.add('hidden');
+            startbildschirm.classList.remove('flex');
+            spiel.classList.remove('hidden');
+            spiel.classList.add('flex');
+            auswertung.classList.add('hidden');
+            auswertung.classList.remove('flex');
+            
+            // 4. 3D-Szene initialisieren (mit Verzögerung, damit Layout Zeit hat)
+            // Prüfen, ob Initialisierung schon lief
+            if (!renderer) {
+                // Kurze Verzögerung, damit das Flex-Layout (#3d-canvas-container) 
+                // eine Höhe > 0 berechnen kann. Verhindert 0/0-Fehler bei Kamera.
+                setTimeout(() => {
+                    init3D(); 
+                    animate3D(); // Startet die Render-Schleife
+                    resize3DCanvas(); // Canvas anpassen
+                    
+                    // 5. Erstes Wort generieren (NACH 3D-Init)
+                    naechstesWort();
+                }, 50); // 50ms Verzögerung
+            } else {
+                 // 5. Erstes Wort generieren (wenn 3D schon lief)
+                resize3DCanvas(); // Sicherstellen, dass Canvas-Größe stimmt
+                naechstesWort();
             }
-            return null;
+        }
+        
+        function zeigeAuswertung() {
+            startbildschirm.classList.add('hidden');
+            spiel.classList.add('hidden');
+            spiel.classList.remove('flex');
+            auswertung.classList.remove('hidden');
+            auswertung.classList.add('flex');
+            
+            // Text aktualisieren
+            richtigeWoerterAnzahl.textContent = state.richtigGelesen;
+            maxWoerterAnzahl.textContent = state.woerterProRunde;
+
+            // Sterne berechnen (1 bis 5)
+            const prozentsatz = state.richtigGelesen / state.woerterProRunde;
+            let sterne = 0;
+            if (prozentsatz >= 0.95) sterne = 5;
+            else if (prozentsatz >= 0.8) sterne = 4;
+            else if (prozentsatz >= 0.6) sterne = 3;
+            else if (prozentsatz >= 0.4) sterne = 2;
+            else if (prozentsatz > 0) sterne = 1;
+
+            // Sterne anzeigen
+            sterneAnzeige.innerHTML = '';
+            for(let i = 0; i < 5; i++) {
+                const span = document.createElement('span');
+                span.textContent = '★'; // Stern-Symbol
+                span.className = i < sterne ? 'text-yellow-400' : 'text-gray-300';
+                sterneAnzeige.appendChild(span);
+            }
         }
 
         // --- Spiel-Logik ---
-        function zeigeSpiel(event) {
-            event.preventDefault();
-            
-            state.gelernteBuchstaben = Array.from(buchstabenContainer.querySelectorAll('input:checked')).map(input => input.value);
-            
-            let min = parseInt(minSilbenInput.value) || 1;
-            let max = parseInt(maxSilbenInput.value) || 3;
-            if (min > max) {
-                min = max;
-                minSilbenInput.value = min;
-            }
-            state.minSilben = min;
-            state.maxSilben = max;
-
-            state.worteProRunde = parseInt(worteProRundeInput.value) || 10;
-            state.silbenFaerben = silbenFaerbenCheckbox.checked;
-            state.silbenAbstand = silbenAbstandCheckbox.checked;
-
-            state.vokale = state.gelernteBuchstaben.filter(b => VOKAL_LISTE.includes(b));
-            state.konsonanten = state.gelernteBuchstaben.filter(b => KONSONANT_LISTE.includes(b));
-            state.diphthonge = state.gelernteBuchstaben.filter(b => DIPHTHONGE_LISTE.includes(b));
-            
-            saveSettings();
-
-            state.aktuellesWortIndex = 0;
-            state.richtigGezählt = 0;
-            state.gezeigteWorte = [];
-
-            startbildschirm.classList.add('hidden');
-            auswertung.classList.add('hidden');
-            spiel.classList.remove('hidden');
-            spiel.classList.add('flex'); 
-
-            generiereUndZeigeNaechstesWort();
-        }
 
         function handleWort(richtig) {
             if (richtig) {
-                state.richtigGezählt++;
-            }
-            
-            if (state.aktuellesWortIndex >= state.worteProRunde) {
-                zeigeAuswertung();
+                state.richtigGelesen++;
+                addCube(); // 3D-Würfel hinzufügen
             } else {
-                generiereUndZeigeNaechstesWort();
+                removeCube(); // 3D-Würfel entfernen
+            }
+            
+            if (state.aktuelleRunde < state.woerterProRunde -1) {
+                state.aktuelleRunde++;
+                naechstesWort();
+            } else {
+                zeigeAuswertung();
             }
         }
 
-        function generiereUndZeigeNaechstesWort() {
-            let silben;
-            let wortString;
+        function naechstesWort() {
+            // Fortschritt aktualisieren
+            aktuellesWortNr.textContent = state.aktuelleRunde + 1;
+            maxWoerterNr.textContent = state.woerterProRunde;
+
+            // Wort generieren
+            let wortSilben;
             let versuche = 0;
-            const MAX_VERSUCHE = 50; 
-
             do {
-                silben = generiereWort();
-                wortString = silben.join('');
+                wortSilben = generiereWort();
                 versuche++;
-            } while (state.gezeigteWorte.includes(wortString) && versuche < MAX_VERSUCHE);
-
-            state.gezeigteWorte.push(wortString);
-            state.aktuellesWort = silben;
+                // Verhindern von Duplikaten in dieser Runde
+            } while (state.generierteWoerterRunde.has(wortSilben.join('')) && versuche < 50);
             
-            displayWort(state.aktuellesWort);
-            state.aktuellesWortIndex++;
+            state.generierteWoerterRunde.add(wortSilben.join(''));
+            
+            // Wort anzeigen
+            displayWort(wortSilben);
         }
 
-        /**
-         * Zeigt das Wort (als Array von Silben) im Container an
-         */
         function displayWort(silbenArray) {
             wortContainer.innerHTML = '';
             
             silbenArray.forEach((silbe, index) => {
                 const span = document.createElement('span');
-                span.textContent = silbe;
+                // ÄNDERUNG: Alles kleinschreiben
+                span.textContent = silbe.toLowerCase();
+                
+                // ÄNDERUNG: Erster Buchstabe der ersten Silbe groß (jetzt nur noch in ~80% der Fälle)
+                if (index === 0 && span.textContent.length > 0 && Math.random() < 0.8) {
+                    span.textContent = span.textContent.charAt(0).toUpperCase() + span.textContent.slice(1);
+                }
                 
                 if (state.silbenFaerben) {
                     span.classList.add(index % 2 === 0 ? 'text-blue-600' : 'text-red-600');
-                    span.classList.add(index % 2 === 0 ? 'dark:text-blue-400' : 'dark:text-red-400');
                 }
-                
                 if (state.silbenAbstand && index < silbenArray.length - 1) {
                     span.style.marginRight = '0.2em';
                 }
-                
                 wortContainer.appendChild(span);
             });
-
+            
             adjustFontSize();
         }
-
-        /**
-         * Passt die Schriftgröße des Wortes dynamisch an die Containerbreite an.
-         */
+        
         function adjustFontSize() {
-            if (!wortContainer.offsetParent) {
-                return; 
-            }
+            const container = document.getElementById('wort-anzeige-container');
+            const span = document.getElementById('wort-anzeige');
+            if (!container || !span) return;
 
-            const container = wortContainer;
-            const parent = spiel; 
+            let aktuelleGroesse = 4.5; // Startgröße in rem (72px)
+            const minGroesse = 1.5; // Mindestgröße in rem
+            span.style.fontSize = `${aktuelleGroesse}rem`;
 
-            const maxFontSize = 4.5; // in rem
-            container.style.fontSize = `${maxFontSize}rem`;
-
-            const parentWidth = parent.clientWidth - 48; // p-6 (links/rechts)
-            let containerWidth = container.scrollWidth;
-
-            if (containerWidth > parentWidth) {
-                let newFontSize = (parentWidth / containerWidth) * maxFontSize;
-                newFontSize *= 0.98; 
-                if (newFontSize < 1.5) newFontSize = 1.5;
-                container.style.fontSize = `${newFontSize}rem`;
+            // Verkleinern, bis es passt
+            while (span.scrollWidth > container.clientWidth && aktuelleGroesse > minGroesse) {
+                aktuelleGroesse -= 0.1;
+                span.style.fontSize = `${aktuelleGroesse}rem`;
             }
         }
-
 
         // --- Wort-Generator ---
 
-        /**
-         * Wählt ein zufälliges Element aus einem Array aus.
-         */
-        function randomChoice(arr) {
-            if (!arr || arr.length === 0) return null;
-            return arr[Math.floor(Math.random() * arr.length)];
+        function updateStateFromUI() {
+            state.gelernteBuchstaben = [];
+            buchstabenContainer.querySelectorAll('input[type="checkbox"]:checked').forEach(cb => {
+                state.gelernteBuchstaben.push(cb.value);
+            });
+            
+            state.vokale = state.gelernteBuchstaben.filter(b => VOKALE_LISTE.includes(b));
+            state.diphthonge = state.gelernteBuchstaben.filter(b => DIPHTHONGE_LISTE.includes(b));
+            state.konsonanten = state.gelernteBuchstaben.filter(b => !VOKALE_LISTE.includes(b) && !DIPHTHONGE_LISTE.includes(b));
+            
+            state.minSilben = parseInt(minSilbenInput.value) || 1;
+            state.maxSilben = parseInt(maxSilbenInput.value) || 3;
+            // Sicherstellen, dass min <= max
+            if (state.minSilben > state.maxSilben) {
+                state.minSilben = state.maxSilben;
+                minSilbenInput.value = state.minSilben;
+            }
+
+            state.woerterProRunde = parseInt(woerterProRundeInput.value) || 10;
+            state.silbenFaerben = silbenFaerbenCheckbox.checked;
+            state.silbenAbstand = silbenAbstandCheckbox.checked;
         }
 
-        /**
-         * Generiert eine einzelne Silbe
-         */
-        function generiereSilbe(noSingleVowel = false, forceTwoPlusLetters = false) {
-            const k = randomChoice(state.konsonanten);
-            const v = randomChoice(state.vokale);
-            const d = randomChoice(state.diphthonge);
-
-            const moeglicheSilben = [];
-
-            if (k && v) moeglicheSilben.push(k + v); // "Ma"
-            if (d) moeglicheSilben.push(d); // "Ei"
-            
-            if (!noSingleVowel && !forceTwoPlusLetters && v) {
-                moeglicheSilben.push(v); // "O"
-            }
-            
-            if (forceTwoPlusLetters && moeglicheSilben.length === 0 && v && !noSingleVowel) {
-                moeglicheSilben.push(v);
-            }
-
-            if (moeglicheSilben.length === 0 && state.gelernteBuchstaben.length > 0) {
-                 return randomChoice(state.gelernteBuchstaben);
-            }
-
-            return randomChoice(moeglicheSilben) || "";
-        }
-
-
-        /**
-         * Generiert ein komplettes Wort aus Silben.
-         */
         function generiereWort() {
             const min = state.minSilben;
             const max = state.maxSilben;
@@ -467,60 +434,424 @@
 
             const silben = [];
             let letzteSilbeWarEinzelVokal = false;
+            let letzterBuchstabe = ''; 
 
             if (state.gelernteBuchstaben.length === 0) {
                 return ["Bitte", "Buchstaben", "wählen"];
             }
-            if (state.vokale.length === 0 && state.diphthonge.length === 0) {
-                return ["Bitte", "Vokale", "lernen"];
-            }
 
             for (let i = 0; i < silbenAnzahl; i++) {
+                // Prüfen, ob eine 2-Buchstaben-Silbe erzwungen werden soll
+                // (Nur wenn min=1 und max=1 UND Konsonanten/Diphthonge verfügbar sind)
                 const forceTwoPlus = (state.minSilben === 1 && state.maxSilben === 1 && (state.konsonanten.length > 0 || state.diphthonge.length > 0));
                 
-                const silbe = generiereSilbe(letzteSilbeWarEinzelVokal, forceTwoPlus);
+                let silbe; 
+                let versuche = 0; 
+                do {
+                    silbe = generiereSilbe(letzteSilbeWarEinzelVokal, forceTwoPlus);
+                    versuche++;
+                    // Prüfe, ob die neue Silbe mit dem letzten Buchstaben der vorherigen Silbe beginnt
+                } while (silbe && silbe.length > 0 && silbe.charAt(0) === letzterBuchstabe && versuche < 20);
+
                 
                 if (silbe) {
                     silben.push(silbe);
+                    // Prüfen, ob die generierte Silbe ein Einzelvokal ist
                     letzteSilbeWarEinzelVokal = (silbe.length === 1 && state.vokale.includes(silbe));
+                    letzterBuchstabe = silbe.slice(-1); // Letzten Buchstaben merken
                 }
             }
             
-            if (silben.length === 0) {
-                 return [generiereSilbe(false, false)];
-            }
-
             return silben;
         }
 
-        // --- Auswertung ---
-        function zeigeAuswertung() {
-            const prozentsatz = state.richtigGezählt / state.worteProRunde;
-            let sterne = 0;
-            if (prozentsatz < 0.2) sterne = 1;
-            else if (prozentsatz < 0.4) sterne = 2;
-            else if (prozentsatz < 0.7) sterne = 3;
-            else if (prozentsatz < 0.9) sterne = 4;
-            else sterne = 5;
+        function generiereSilbe(letzteSilbeWarEinzelVokal, forceTwoPlus) {
+            const hatVokale = state.vokale.length > 0;
+            const hatKonsonanten = state.konsonanten.length > 0;
+            const hatDiphthonge = state.diphthonge.length > 0;
 
-            sterneBewertung.innerHTML = '★'.repeat(sterne) + '☆'.repeat(5 - sterne);
+            if (!hatVokale && !hatDiphthonge) {
+                return hatKonsonanten ? state.konsonanten[Math.floor(Math.random() * state.konsonanten.length)] : null;
+            }
 
-            spiel.classList.add('hidden');
-            spiel.classList.remove('flex');
-            auswertung.classList.remove('hidden');
-            auswertung.classList.add('flex');
+            const gewichtung = 10; // KORREKTUR: Gewichtung auf 10 erhöht
+            const moeglicheTypen = [];
+
+            // 1. Alle Typen mit Gewichtung hinzufügen
+            if (hatVokale) moeglicheTypen.push('V'); // 1x
+            if (hatDiphthonge) {
+                for (let i = 0; i < gewichtung; i++) moeglicheTypen.push('D');
+            }
+            if (hatKonsonanten && hatVokale) {
+                for (let i = 0; i < gewichtung; i++) moeglicheTypen.push('KV');
+            }
+            if (hatKonsonanten && hatDiphthonge) {
+                for (let i = 0; i < gewichtung; i++) moeglicheTypen.push('KD');
+            }
+
+            if (moeglicheTypen.length === 0) return null;
+
+            // 2. Liste basierend auf Regeln filtern
+            let gefilterteTypen = moeglicheTypen;
+
+            // Regel 1: Nach Einzelvokal muss Konsonant+Vokal kommen
+            if (letzteSilbeWarEinzelVokal) {
+                gefilterteTypen = moeglicheTypen.filter(t => t === 'KV' || t === 'KD');
+            }
+            
+            // Regel 2: Wenn 2+ Buchstaben erzwungen sind, keine Einzelvokale
+            if (forceTwoPlus) {
+                // Filtere Vokale aus der *gefilterten* Liste (falls Regel 1 aktiv war) oder der *Hauptliste*
+                const basisListe = (letzteSilbeWarEinzelVokal && gefilterteTypen.length > 0) ? gefilterteTypen : moeglicheTypen;
+                gefilterteTypen = basisListe.filter(t => t !== 'V');
+            }
+            
+            // Regel 3: (Kombination von 1 & 2): Wenn nach Einzelvokal, filtere Vokale (redundant, aber sicher)
+            if(letzteSilbeWarEinzelVokal) {
+                gefilterteTypen = gefilterteTypen.filter(t => t !== 'V');
+            }
+
+
+            // Fallback: Wenn Filterung alles entfernt (z.B. nur Vokale gelernt)
+            if (gefilterteTypen.length === 0) {
+                 // Nimm die ursprüngliche Liste, aber entferne Einzelvokale, wenn möglich
+                gefilterteTypen = moeglicheTypen.filter(t => t !== 'V');
+                if (gefilterteTypen.length === 0) {
+                    gefilterteTypen = moeglicheTypen; // Nimm, was da ist
+                }
+            }
+
+            if (gefilterteTypen.length === 0) return null; // Sollte nicht passieren
+
+            const silbenTyp = gefilterteTypen[Math.floor(Math.random() * gefilterteTypen.length)];
+
+            switch (silbenTyp) {
+                case 'V':
+                    return state.vokale[Math.floor(Math.random() * state.vokale.length)];
+                case 'D':
+                    return state.diphthonge[Math.floor(Math.random() * state.diphthonge.length)];
+                case 'KV':
+                    return state.konsonanten[Math.floor(Math.random() * state.konsonanten.length)] +
+                           state.vokale[Math.floor(Math.random() * state.vokale.length)];
+                case 'KD':
+                    return state.konsonanten[Math.floor(Math.random() * state.konsonanten.length)] +
+                           state.diphthonge[Math.floor(Math.random() * state.diphthonge.length)];
+                default:
+                    return null;
+            }
+        }
+        
+        // --- localStorage (Speichern & Laden) ---
+        
+        function speichereEinstellungen() {
+            try {
+                const einstellungen = {
+                    buchstaben: state.gelernteBuchstaben,
+                    minSilben: state.minSilben,
+                    maxSilben: state.maxSilben,
+                    woerterProRunde: state.woerterProRunde,
+                    silbenFaerben: state.silbenFaerben,
+                    silbenAbstand: state.silbenAbstand
+                };
+                localStorage.setItem('leseAppEinstellungen', JSON.stringify(einstellungen));
+            } catch (e) {
+                console.warn("Speichern der Einstellungen im localStorage fehlgeschlagen:", e);
+            }
+        }
+        
+        function ladeEinstellungen() {
+            try {
+                const gespeicherte = localStorage.getItem('leseAppEinstellungen');
+                if (gespeicherte) {
+                    const einstellungen = JSON.parse(gespeicherte);
+                    
+                    // Checkboxen (Buchstaben)
+                    if (einstellungen.buchstaben && Array.isArray(einstellungen.buchstaben)) {
+                        buchstabenContainer.querySelectorAll('input[type="checkbox"]').forEach(cb => {
+                            cb.checked = einstellungen.buchstaben.includes(cb.value);
+                        });
+                    }
+                    
+                    // Formularfelder
+                    minSilbenInput.value = einstellungen.minSilben || 2;
+                    maxSilbenInput.value = einstellungen.maxSilben || 3;
+                    woerterProRundeInput.value = einstellungen.woerterProRunde || 10;
+                    silbenFaerbenCheckbox.checked = einstellungen.silbenFaerben !== false; // Standard true
+                    silbenAbstandCheckbox.checked = einstellungen.silbenAbstand === true; // Standard false
+
+                } else {
+                    // Standard-Buchstaben beim ersten Start
+                    const standardBuchstaben = ['A', 'M', 'O', 'L', 'I'];
+                    buchstabenContainer.querySelectorAll('input[type="checkbox"]').forEach(cb => {
+                        cb.checked = standardBuchstaben.includes(cb.value);
+                    });
+                }
+            } catch (e) {
+                console.warn("Laden der Einstellungen aus dem localStorage fehlgeschlagen:", e);
+                // Standard-Buchstaben als Fallback bei Fehler
+                const standardBuchstaben = ['A', 'M', 'O', 'L', 'I'];
+                buchstabenContainer.querySelectorAll('input[type="checkbox"]').forEach(cb => {
+                    cb.checked = standardBuchstaben.includes(cb.value);
+                });
+            }
+        }
+        
+        
+        // --- 3D / Three.js / Cannon.js Logik ---
+
+        function init3D() {
+            const container = document.getElementById('3d-canvas-container');
+            if (!container || !container.clientHeight) return;
+            
+            // Verhindern, dass mehr als ein Renderer erstellt wird
+            if (renderer) return; 
+
+            // --- 1. Physik-Welt initialisieren (CANNON.js) ---
+            world = new CANNON.World();
+            world.gravity.set(0, -9.82, 0); // Schwerkraft
+            world.broadphase = new CANNON.NaiveBroadphase();
+            
+            // "Einschlafen" erlauben
+            world.allowSleep = true;
+
+
+            // Materialien definieren
+            groundMaterial = new CANNON.Material('ground');
+            cubeMaterial = new CANNON.Material('cube');
+            
+            // Kontaktmaterial für Würfel <-> Würfel (hohe Reibung, wenig Bounce)
+            const cubeContactMaterial = new CANNON.ContactMaterial(cubeMaterial, cubeMaterial, {
+                friction: 0.9, // Hohe Reibung (Holz auf Holz)
+                restitution: 0.01 // Geringe Elastizität (prallt kaum)
+            });
+            world.addContactMaterial(cubeContactMaterial);
+
+            // Kontaktmaterial für Würfel <-> Boden
+            const groundContactMaterial = new CANNON.ContactMaterial(groundMaterial, cubeMaterial, {
+                friction: 0.9,
+                restitution: 0.01
+            });
+            world.addContactMaterial(groundContactMaterial);
+
+            // Unsichtbarer Boden (Physik-Objekt)
+            const groundShape = new CANNON.Plane();
+            const groundBody = new CANNON.Body({ mass: 0, material: groundMaterial }); // mass: 0 = statisch
+            groundBody.addShape(groundShape);
+            // Rotiere die Ebene, damit sie flach liegt
+            groundBody.quaternion.setFromAxisAngle(new CANNON.Vec3(1, 0, 0), -Math.PI / 2);
+            groundBody.position.y = -0.5; // Basis des ersten Würfels
+            world.addBody(groundBody);
+
+
+            // --- 2. Three.js Szene ---
+            scene = new THREE.Scene();
+
+            // 2. Kamera
+            const breite = container.clientWidth;
+            const hoehe = container.clientHeight;
+            if (hoehe === 0) { // Sicherheitscheck
+                 console.error("3D-Container hat keine Höhe. Breche Init ab.");
+                 return;
+            }
+            camera = new THREE.PerspectiveCamera(75, breite / hoehe, 0.1, 1000);
+            camera.position.set(0, 5, 10); // Positioniert auf den Turm
+            camera.lookAt(0, 4, 0); // Schaut leicht nach oben
+
+            // 3. Renderer
+            renderer = new THREE.WebGLRenderer({ antialias: true, alpha: true }); // alpha: true für transparenten Hintergrund
+            renderer.setSize(breite, hoehe);
+            renderer.setPixelRatio(window.devicePixelRatio);
+            container.appendChild(renderer.domElement);
+
+            // 4. Lichter
+            const ambientLight = new THREE.AmbientLight(0xffffff, 0.7);
+            scene.add(ambientLight);
+            
+            const directionalLight = new THREE.DirectionalLight(0xffffff, 1.0);
+            directionalLight.position.set(5, 10, 7.5);
+            scene.add(directionalLight);
+            
+            // 5. Turm-Basis (Rotationsgruppe)
+            towerGroup = new THREE.Group();
+            scene.add(towerGroup);
+            
+            // 6. Stern (Ziel)
+            const starShape = new THREE.Shape();
+            starShape.moveTo(0, 1);
+            starShape.lineTo(0.22, 0.31);
+            starShape.lineTo(0.95, 0.31);
+            starShape.lineTo(0.36, -0.12);
+            starShape.lineTo(0.59, -0.81);
+            starShape.lineTo(0, -0.5);
+            starShape.lineTo(-0.59, -0.81);
+            starShape.lineTo(-0.36, -0.12);
+            starShape.lineTo(-0.95, 0.31);
+            starShape.lineTo(-0.22, 0.31);
+            starShape.lineTo(0, 1);
+            
+            const extrudeSettings = { depth: 0.2, bevelEnabled: false };
+            const starGeometry = new THREE.ExtrudeGeometry(starShape, extrudeSettings);
+            const starMaterial = new THREE.MeshStandardMaterial({ 
+                color: 0xffff00, 
+                emissive: STAR_DIM_COLOR, // Startet gedimmt
+                metalness: 0.5,
+                roughness: 0.5 
+            });
+            star = new THREE.Mesh(starGeometry, starMaterial);
+            star.position.set(0, MAX_TOWER_HEIGHT + 1.5, 0); // Oben über dem Turm
+            star.scale.set(0.8, 0.8, 0.8);
+            towerGroup.add(star);
         }
 
-        function zeigeStartbildschirm() {
-            auswertung.classList.add('hidden');
-            auswertung.classList.remove('flex');
-            spiel.classList.add('hidden'); // Sicherstellen, dass Spiel auch ausgeblendet wird
-            spiel.classList.remove('flex');
-            startbildschirm.classList.remove('hidden');
-            startbildschirm.classList.add('flex');
+        function resize3DCanvas() {
+            const container = document.getElementById('3d-canvas-container');
+            if (container && renderer && camera) {
+                const breite = container.clientWidth;
+                const hoehe = container.clientHeight;
+                
+                if (hoehe === 0) return; // Nicht rendern, wenn nicht sichtbar
+
+                renderer.setSize(breite, hoehe);
+                camera.aspect = breite / hoehe;
+                camera.updateProjectionMatrix();
+            }
+        }
+
+        function animate3D() {
+            requestAnimationFrame(animate3D);
+
+            // Stoppt, wenn Szene nicht initialisiert ist
+            if (!renderer || !scene || !camera || !world) {
+                return;
+            }
+
+            // Physik-Simulation einen Schritt weiterführen
+            world.step(1 / 60); // Feste Zeitschritte
+
+            // Turm langsam drehen (nur die three.js Gruppe)
+            if (towerGroup) {
+                towerGroup.rotation.y += 0.005;
+            }
+
+            // 1. Positionen der Turm-Würfel aktualisieren
+            // (mesh-Position an body-Position anpassen)
+            cubes.forEach(cubeData => {
+                cubeData.mesh.position.copy(cubeData.body.position);
+                cubeData.mesh.quaternion.copy(cubeData.body.quaternion);
+            });
+
+            // 2. Positionen der fallenden Würfel aktualisieren
+            for (let i = fallingCubes.length - 1; i >= 0; i--) {
+                const cubeData = fallingCubes[i];
+                cubeData.mesh.position.copy(cubeData.body.position);
+                cubeData.mesh.quaternion.copy(cubeData.body.quaternion);
+
+                // Aufräumen, wenn Würfel aus dem Bild ist
+                if (cubeData.body.position.y < -10) {
+                    world.removeBody(cubeData.body);
+                    towerGroup.remove(cubeData.mesh);
+                    fallingCubes.splice(i, 1);
+                }
+            }
+
+            // 3. Stern leuchten lassen
+            if (star && cubes.length === MAX_TOWER_HEIGHT) {
+                // Prüfen, ob der oberste Würfel "ruht"
+                const topBody = cubes[cubes.length - 1].body;
+                if (topBody.sleepState === CANNON.Body.SLEEPING || topBody.velocity.length() < 0.1) {
+                    star.material.emissive.setHex(STAR_LIT_COLOR);
+                }
+            }
+            
+            renderer.render(scene, camera);
+        }
+
+        function addCube() {
+            if (cubes.length >= MAX_TOWER_HEIGHT || !towerGroup || !world) return;
+
+            // 1. Three.js Mesh (das Sichtbare)
+            const geometry = new THREE.BoxGeometry(1, 1, 1);
+            // Wechselfarben für die Würfel
+            const color = cubes.length % 2 === 0 ? 0x3b82f6 : 0xef4444; // Blau / Rot
+            const material = new THREE.MeshStandardMaterial({ color: color });
+            const mesh = new THREE.Mesh(geometry, material);
+            
+            // 2. Cannon.js Body (die Physik)
+            const shape = new CANNON.Box(new CANNON.Vec3(0.5, 0.5, 0.5)); // Halbe Kantenlänge
+            const body = new CANNON.Body({ mass: 1, material: cubeMaterial });
+            body.addShape(shape);
+
+            // NEU: Dämpfung hinzufügen, damit Würfel schneller "einschlafen"
+            body.linearDamping = 0.8; // Höhere Dämpfung
+            body.angularDamping = 0.8;
+            
+            // NEU: Parameter für schnelleres Einschlafen
+            body.sleepSpeedLimit = 0.1; // Ruht, wenn Geschwindigkeit darunter fällt
+            body.sleepTimeLimit = 0.5; // nach 0.5s Inaktivität
+
+            // Startposition: Oben, hinter dem Text
+            // Leichte X-Zufallsposition, damit der Turm "wackelig" wird
+            const startX = (Math.random() - 0.5) * 0.05; // Geringerer Versatz
+            body.position.set(startX, MAX_TOWER_HEIGHT + 5, 0);
+            
+            // Rotation: Nur Y-Achse
+            body.quaternion.setFromAxisAngle(new CANNON.Vec3(0, 1, 0), Math.random() * Math.PI * 2);
+
+            // Hinzufügen
+            world.addBody(body);
+            towerGroup.add(mesh); // Zur Rotationsgruppe hinzufügen
+            cubes.push({ mesh: mesh, body: body }); // Als Paar speichern
+        }
+
+        function removeCube() {
+            if (cubes.length === 0 || !world) return;
+
+            const cubeData = cubes.pop(); // Obersten Würfel holen
+
+            // "Einschlafen" verhindern, damit der Impuls funktioniert
+            cubeData.body.wakeUp(); 
+            
+            // Leichter "Hüpfer" nach oben
+            const force = 3 + Math.random() * 2; // Kraft des Hüpfers
+            cubeData.body.applyImpulse(
+                new CANNON.Vec3(0, force, 0), // Impuls nach oben
+                // An einem zufälligen Punkt ansetzen, damit er kippt:
+                new CANNON.Vec3((Math.random() - 0.5) * 0.5, 0, (Math.random() - 0.5) * 0.5) 
+            );
+            
+            fallingCubes.push(cubeData); // In die "fallend" Liste verschieben
+            
+            // Stern dimmen, wenn er geleuchtet hat
+            if (star) {
+                star.material.emissive.setHex(STAR_DIM_COLOR);
+            }
+        }
+
+        function resetTower() {
+            if (!towerGroup || !world) return;
+
+            // Alle Turm-Würfel entfernen
+            cubes.forEach(cubeData => {
+                world.removeBody(cubeData.body);
+                towerGroup.remove(cubeData.mesh);
+            });
+            cubes = [];
+
+            // Alle fallenden Würfel entfernen
+            fallingCubes.forEach(cubeData => {
+                world.removeBody(cubeData.body);
+                towerGroup.remove(cubeData.mesh);
+            });
+            fallingCubes = [];
+
+            // Stern dimmen
+            if (star) {
+                star.material.emissive.setHex(STAR_DIM_COLOR);
+            }
         }
 
     </script>
 </body>
 </html>
+
 
